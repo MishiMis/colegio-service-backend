@@ -17,27 +17,24 @@ type Tokens ={
 export class UsersService {
   constructor(@InjectModel(User.name) private userModel: Model<UserDocument>, private jwtSvc: JwtService){}
 
-   async create(createUserDto: CreateUserDto){
+  async create(createUserDto: CreateUserDto) {
     try {
       const hashedPassword = await bcrypt.hash(createUserDto.contraseña, 10);
       const createdUser = new this.userModel({
-        ... createUserDto,
-        contraseña : hashedPassword
+        ...createUserDto,
+        contraseña: hashedPassword,
       });
-      const user = await createdUser.save()
-      const {access_token,refresh_token} = await this.generateTokens(user);
-      return{
-        access_token,
-        refresh_token,
+      const user = await createdUser.save();
+      return {
         user: this.removePassword(user),
-        status:HttpStatus.CREATED,
-        message:'User create Successfully'
-      } 
-      
+        status: HttpStatus.CREATED,
+        message: 'Usuario creado exitosamente',
+      };
     } catch (error) {
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException('Error interno del servidor', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
+
   
   async loginUser(correo: string, contraseña:string) {
     try {
