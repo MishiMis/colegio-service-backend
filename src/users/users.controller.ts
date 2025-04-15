@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Req } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -7,7 +7,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Post()
+  @Post('create')
   create(@Body() createUserDto: CreateUserDto) {
     return this.usersService.create(createUserDto);
   }
@@ -16,6 +16,15 @@ export class UsersController {
     const {correo , contraseña} = createUserDto
     return this.usersService.loginUser(correo, contraseña);
   }
+  @Post('refreshToken')
+  refreshToken(@Req() request: Request){
+    const [type, token] = request.headers['authorization']?.split('') || []
+    this.usersService.refreshToken(token)
+
+
+  }
+
+
 
   @Get()
   findAll() {
