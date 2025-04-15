@@ -18,14 +18,9 @@ export class UsersController {
   }
   @Post('refreshToken')
   refreshToken(@Req() request: Request){
-    const [type, token] = request.headers['authorization']?.split('') || []
-    this.usersService.refreshToken(token)
-
-
+    const [type, token] = request.headers['authorization']?.split(' ') || []
+    return this.usersService.refreshToken(token)
   }
-
-
-
   @Get()
   findAll() {
     return this.usersService.findAll();

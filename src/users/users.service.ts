@@ -17,19 +17,28 @@ type Tokens ={
 export class UsersService {
   constructor(@InjectModel(User.name) private userModel: Model<UserDocument>, private jwtSvc: JwtService){}
 
-   async create(createUserDto: CreateUserDto):  Promise<User> {
+   async create(createUserDto: CreateUserDto){
     try {
       const hashedPassword = await bcrypt.hash(createUserDto.contraseña, 10);
       const createdUser = new this.userModel({
         ... createUserDto,
         contraseña : hashedPassword
       });
-      return await createdUser.save();
+      const user = await createdUser.save()
+      const {access_token,refresh_token} = await this.generateTokens(user);
+      return{
+        access_token,
+        refresh_token,
+        user: this.removePassword(user),
+        status:HttpStatus.CREATED,
+        message:'User create Successfully'
+      } 
       
     } catch (error) {
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
+  
   async loginUser(correo: string, contraseña:string) {
     try {
       const user = await this.userModel.findOne({correo});
@@ -44,16 +53,11 @@ export class UsersService {
       }
       if(user && isPasswordValid){
         const payload = {sub: user._id, correo: user.correo, nombre: user.nombre}
-        // const {correo, nombre } = user
+        const {access_token,refresh_token} = await this.generateTokens(payload);
         return {
-          access_token: await this.jwtSvc.signAsync(payload,{
-            secret:'jwt_secret',
-            expiresIn:'1d'
-          }),
-          refresh_token: await this.jwtSvc.signAsync(payload,{
-            secret: 'jwt_secret_refresh',
-            expiresIn:'7d'
-          }),
+          access_token,
+          refresh_token,
+          user: this.removePassword(user),
           message:'Usuario autenticado exitosamente'
         };
       }
@@ -64,25 +68,27 @@ export class UsersService {
 
   async refreshToken(refreshToken:string){
     try {
-      const user = this.jwtSvc.verify(refreshToken,{secret:'jwt_secret_refresh'});
+      const user = this.jwtSvc.verify(refreshToken,{ secret:'jwt_secret_refresh' });
       const payload = {sub: user._id, correo: user.correo, nombre: user.nombre};
       const {access_token,refresh_token} = await this.generateTokens(payload);
       return{
         access_token,
-        refreshToken,
+        refresh_token,
         status:200,
         message:'Refresh Token Successfully'
       } 
     } catch (error) {
-      throw new HttpException('Refresh token failed', HttpStatus.INTERNAL_SERVER_ERROR);
-
-      
+      if (error.name === 'TokenExpiredError') {
+        throw new HttpException('Refresh token expirado', HttpStatus.UNAUTHORIZED);
+      }
+      if (error.name === 'JsonWebTokenError') {
+        throw new HttpException('Refresh token inválido', HttpStatus.BAD_REQUEST);
+      }
+      throw new HttpException('Error al refrescar el token', HttpStatus.INTERNAL_SERVER_ERROR);
     }
-
-
   }
 
-  private async generateTokens(user,):Promise<Tokens>{
+  private async generateTokens(user):Promise<Tokens>{
     const jwtPayload = {sub: user._id, correo: user.correo, nombre: user.nombre}
     const [accessToken,refreshToken] = await Promise.all([
       this.jwtSvc.signAsync(jwtPayload,{
@@ -98,6 +104,11 @@ export class UsersService {
       access_token: accessToken,
       refresh_token: refreshToken
     }
+  }
+  private removePassword(user){
+    const {contraseña, ... rest} = user.toObject();
+    return rest
+
   }
   findAll() {
     return `This action returns all users`;
